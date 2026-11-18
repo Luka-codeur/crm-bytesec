@@ -1,4 +1,4 @@
-// Prerequis : npm i playwright (hors depot) ; Chrome installe. Voir README (Tests).
+// Prerequis : npm i playwright (hors depot) ; Chrome installe. Voir le README, section Tests.
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE ?? "http://localhost:8081";
@@ -58,22 +58,23 @@ await check("detail client + changement de statut confirme", async () => {
 
 await page.getByRole("link", { name: "Projets" }).first().click();
 await check("liste projets", async () => { await page.getByRole("heading", { name: "Projets" }).waitFor(T); });
-await check("creation projet (pack + formation)", async () => {
+await check("creation projet sans client (pack + prix auto)", async () => {
   await page.getByRole("link", { name: /Nouveau projet/ }).first().click();
   await page.getByLabel("Nom du projet").fill("Projet Playwright");
-  await page.getByRole("combobox", { name: "Client" }).click();
-  await page.getByRole("option", { name: "Awa Testeur" }).click();
+  if (await page.getByRole("combobox", { name: "Client" }).count()) throw new Error("champ client present");
+  await page.getByRole("button", { name: /Ajouter un pack/ }).click();
   await page.getByLabel("Nom du pack").fill("Pack Test");
-  await page.getByLabel("Prix (FCFA)").fill("500000");
   await page.locator("label", { hasText: /h ·/ }).first().click();
+  await page.getByText(/Calculé automatiquement/).waitFor(T);
+  await page.getByText(/Paiement en 3 tranches/).waitFor(T);
   await page.getByRole("button", { name: "Créer le projet" }).click();
-  await page.getByText("Projet créé").waitFor(T);
+  await page.getByText(/Projet créé/).waitFor(T);
   await page.getByRole("heading", { name: "Projet Playwright" }).waitFor(T);
 });
-await check("envoyer au client", async () => {
-  await page.getByRole("button", { name: /Envoyer au client/ }).click();
-  await page.getByRole("button", { name: "Envoyer", exact: true }).click();
-  await page.getByText("Projet envoyé au client").waitFor(T);
+await check("lien de consultation du projet", async () => {
+  await page.getByRole("textbox", { name: /Lien de consultation/ }).waitFor(T);
+  await page.getByRole("button", { name: "Copier le lien" }).click();
+  await page.getByText("Lien copié dans le presse-papiers").waitFor(T);
 });
 
 await page.getByRole("link", { name: "Factures" }).first().click();
@@ -139,6 +140,46 @@ await check("agent: pas de Journal dans la nav", async () => {
 });
 await page.getByRole("link", { name: "Tâches" }).first().click();
 await check("agent: kanban 3 colonnes", async () => { for (const c of ["À faire", "En cours", "Terminée"]) await page.getByRole("region", { name: c }).waitFor(T); });
+
+await check("liens publics (mode demo): projet + inscription", async () => {
+  const c = await browser.newContext();
+  const v = await c.newPage();
+  v.setDefaultTimeout(8000);
+  await v.goto(`${BASE}/p/mock-p-1`);
+  await v.getByRole("heading", { name: "Programme de sensibilisation 2027" }).waitFor();
+  await v.getByText(/Paiement en 3 tranches/).first().waitFor();
+  await v.getByRole("button", { name: "S'inscrire maintenant" }).click();
+  await v.getByLabel("Prénom").fill("Test");
+  await v.getByLabel("Nom", { exact: true }).fill("Public");
+  await v.getByLabel("E-mail").fill("test.public@exemple.org");
+  await v.getByLabel("Téléphone").fill("770000000");
+  await v.getByRole("button", { name: "Confirmer mon inscription" }).click();
+  await v.getByText("Inscription enregistrée").waitFor();
+  await c.close();
+});
+await check("liens publics (mode demo): validation de pro forma -> facture signee", async () => {
+  const c = await browser.newContext();
+  const v = await c.newPage();
+  v.setDefaultTimeout(8000);
+  await v.goto(`${BASE}/pf/mock-pf-3`);
+  await v.getByRole("heading", { name: /Pro forma PF-2026-0003/ }).waitFor();
+  await v.getByLabel(/Votre nom complet/).fill("Awa Koné");
+  await v.getByRole("button", { name: "Valider", exact: true }).click();
+  await v.getByRole("button", { name: "Oui, valider" }).click();
+  await v.getByText("Pro forma validée, merci !").waitFor();
+  await v.getByRole("link", { name: "Consulter ma facture" }).click();
+  await v.getByText("Document non modifiable").waitFor();
+  await v.getByText("Signature valide").waitFor();
+  await c.close();
+});
+await check("liens publics (mode demo): lien invalide", async () => {
+  const c = await browser.newContext();
+  const v = await c.newPage();
+  v.setDefaultTimeout(8000);
+  await v.goto(`${BASE}/p/inconnu`);
+  await v.getByText("Lien introuvable").waitFor();
+  await c.close();
+});
 
 await page.screenshot({ path: "shot-agent.png" });
 console.log(`\n${ok} ok, ${fail} echecs`);

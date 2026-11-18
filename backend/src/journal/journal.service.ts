@@ -10,6 +10,8 @@ export interface JournalInput {
   cibleType: JournalTable['cible_type'];
   cibleId: string;
   cibleLibelle: string;
+  /** Personne extérieure (lien public) à l'origine de l'événement, affichée à la place de l'acteur interne. */
+  acteurExterne?: string;
   clientId?: string | null;
   avant?: Record<string, unknown>;
   apres?: Record<string, unknown>;
@@ -27,6 +29,7 @@ export class JournalService {
         cible_type: e.cibleType,
         cible_id: e.cibleId,
         cible_libelle: e.cibleLibelle,
+        acteur_externe: e.acteurExterne ?? null,
         client_id: e.clientId ?? null,
         avant: e.avant ? JSON.stringify(e.avant) : null,
         apres: e.apres ? JSON.stringify(e.apres) : null,

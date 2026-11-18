@@ -20,3 +20,12 @@ databaseChangeLog:
   - include:
       file: changes/0007-fix-proforma-verrou.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0008-projet-lien-public.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0009-proforma-public.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0010-facture-signee-journal.sql
+      relativeToChangelogFile: true

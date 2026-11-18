@@ -1,3 +1,4 @@
+// Prerequis : npm i playwright (hors depot) ; Chrome installe. Voir le README, section Tests.
 // Parcours de démonstration enregistré en vidéo (front + API + Keycloak réels).
 // Prérequis : base métier peuplée par backend/scripts/seed_demo.py, front sur :8082 (VITE_USE_MOCK=false).
 import { chromium } from "playwright";
@@ -15,7 +16,8 @@ const ctx = await browser.newContext({
   locale: "fr-FR",
 });
 const page = await ctx.newPage();
-page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(60000);
+page.setDefaultTimeout(15000);
+page.setDefaultNavigationTimeout(60000);
 
 // Sous-titres + pointeur visibles dans la vidéo (persistants d'une page à l'autre via window.name).
 await page.addInitScript(() => {
@@ -47,10 +49,12 @@ const step = async (name, fn) => {
   try { await fn(); log.push(["ok", name]); console.log("  ok  ", name); }
   catch (e) {
     log.push(["FAIL", name]);
-    console.log("  FAIL", name, "-", e.message.split("\n")[0].slice(0, 200));
+    console.log("  FAIL", name, "-", e.message.split("\n").slice(0, 3).join(" | ").slice(0, 260));
     await page.screenshot({ path: `${OUT}/echec-${log.length}.png` }).catch(() => {});
   }
 };
+const lien = () => page.getByRole("textbox", { name: /Lien de consultation/ }).inputValue();
+
 async function kcLogin(user, label) {
   await page.waitForURL(/localhost:8080\/realms\/crm/);
   await cap(label, 1800);
@@ -65,9 +69,19 @@ async function apiToken(u) {
   });
   return (await r.json()).access_token;
 }
+/** Retour dans l'espace interne après une visite de page publique (la session Keycloak est conservée). */
+async function retourEspaceInterne(chemin, attente) {
+  await cap("", 0);
+  await page.goto(`${BASE}${chemin}`);
+  await attente();
+}
+
+let urlProjet = "";
+let urlPro = "";
 
 /* ===================== AGENT ===================== */
 await step("connexion agent (Keycloak)", async () => {
+  await cap("", 0);
   await page.goto(`${BASE}/clients`);
   await cap("ByteSec CRM · démonstration du MVP", 2500);
   await kcLogin("agent", "Connexion sécurisée via Keycloak · compte « agent »");
@@ -123,44 +137,80 @@ await step("détail client, statut, historique", async () => {
   await cap("Historique : qui, quoi, quand, avec le diff avant → après", 3200);
 });
 
-await step("projet avec pack et formations, envoi", async () => {
+/* ---------- Projet : plus de champ client, un lien de consultation ---------- */
+await step("projet: packs, prix automatique, tranches", async () => {
   await page.getByRole("link", { name: "Projets" }).first().click();
-  await cap("Projets : un projet a des packs, un pack a des formations", 2200);
+  await cap("Projets : plus de champ « client » · chaque projet a un lien à partager", 2800);
   await page.getByRole("link", { name: /Nouveau projet/ }).first().click();
   await type(page.getByLabel("Nom du projet"), "Cyber-sensibilisation Ecobank");
-  await page.getByRole("combobox", { name: "Client" }).click();
-  await page.getByRole("option", { name: "Aminata Gueye" }).click();
-  await cap("Un projet contient un ou plusieurs packs", 1800);
+  await type(page.getByLabel("Description").first(), "Programme pour 80 collaborateurs");
+  await cap("Un projet peut n'avoir aucun pack, ou en avoir plusieurs", 2400);
+  await page.getByRole("button", { name: /Ajouter un pack/ }).click();
   await type(page.getByLabel("Nom du pack"), "Pack Découverte");
-  await type(page.getByLabel("Prix (FCFA)").first(), "400000");
   await page.locator("label", { hasText: "Sensibilisation au phishing" }).first().click();
   await page.locator("label", { hasText: "Hygiène numérique" }).first().click();
-  await cap("Formations du catalogue cochées dans le pack", 2000);
-  await type(page.getByLabel("Titre de la formation"), "Atelier simulation de crise");
-  await type(page.getByLabel("Durée en heures"), "2");
-  await type(page.getByLabel("Prix en FCFA"), "150000");
-  await page.getByRole("button", { name: "Ajouter au catalogue" }).click();
-  await cap("Nouvelle formation ajoutée au catalogue à la volée", 2000);
+  await cap("Le prix du pack se calcule automatiquement : somme des formations", 3000);
+  const prix = page.getByLabel("Prix du pack (FCFA)");
+  await type(prix, "500000");
+  await cap("… et reste modifiable · le paiement est découpé en 3 tranches", 3200);
+  await page.getByRole("button", { name: /Rétablir le prix calculé/ }).click();
+  await cap("« Rétablir » ramène le prix calculé", 2000);
+  await type(prix, "520000");
   await page.getByRole("button", { name: "Créer le projet" }).click();
   await page.getByRole("heading", { name: "Cyber-sensibilisation Ecobank" }).waitFor();
-  await cap("Projet créé · prêt à être envoyé au client", 2200);
-  await page.getByRole("button", { name: /Envoyer au client/ }).click();
-  await pause(800);
-  await page.getByRole("button", { name: "Envoyer", exact: true }).click();
-  await page.getByText("Projet envoyé au client").waitFor();
-  await cap("Projet envoyé au client", 2000);
+  await cap("Projet créé · son lien de consultation est prêt", 2400);
 });
 
-await step("pro forma: validation, calcul, statuts", async () => {
+await step("copier le lien du projet", async () => {
+  await page.getByRole("button", { name: "Copier le lien" }).click();
+  await page.getByText("Lien copié dans le presse-papiers").waitFor();
+  urlProjet = await lien();
+  await cap("L'agent copie le lien et l'envoie par WhatsApp, e-mail, SMS…", 3000);
+});
+
+/* ---------- Le prospect, sans compte, ouvre le lien ---------- */
+await step("visiteur: page publique du projet + inscription", async () => {
+  await cap("", 0);
+  await page.goto(urlProjet);
+  await page.getByRole("heading", { name: "Cyber-sensibilisation Ecobank" }).waitFor();
+  await cap("CÔTÉ PROSPECT · page publique : aucun compte requis, lecture seule", 3200);
+  await page.getByText(/Paiement en 3 tranches/).first().scrollIntoViewIfNeeded();
+  await cap("Le prix n'apparaît qu'en 3 tranches, jamais en total", 3200);
+  await page.getByRole("button", { name: "S'inscrire maintenant" }).click();
+  await pause(600);
+  await page.getByRole("button", { name: "Confirmer mon inscription" }).click();
+  await cap("Formulaire validé", 1800);
+  await type(page.getByLabel("Prénom"), "Awa");
+  await type(page.getByLabel("Nom", { exact: true }), "Camara");
+  await type(page.getByLabel("E-mail"), "awa.camara@exemple.org");
+  await type(page.getByLabel("Téléphone"), "+221 77 000 11 22");
+  await page.getByRole("button", { name: "Confirmer mon inscription" }).click();
+  await page.getByText("Inscription enregistrée").waitFor();
+  await cap("Inscription en un clic : la personne est ajoutée à la base clients", 3200);
+});
+
+await step("agent: l'inscrit apparaît (projet + base clients)", async () => {
+  await retourEspaceInterne("/projets", async () => {
+    await page.getByRole("heading", { name: "Projets" }).waitFor();
+  });
+  await page.getByRole("link", { name: "Cyber-sensibilisation Ecobank" }).click();
+  await page.getByRole("link", { name: "Awa Camara" }).waitFor();
+  await cap("CÔTÉ AGENT · l'inscrit apparaît sur le projet", 2800);
+  await page.getByRole("link", { name: "Clients" }).first().click();
+  await page.getByRole("link", { name: "Awa Camara" }).waitFor();
+  await cap("… et dans la base clients (prospect, rattaché à l'agent)", 3000);
+});
+
+/* ---------- Pro forma : plusieurs projets, signature, lien ---------- */
+await step("pro forma sans client, sur plusieurs projets", async () => {
   await page.getByRole("link", { name: "Factures" }).first().click();
-  await cap("Factures : pro forma modifiables, commerciales verrouillées", 2400);
+  await cap("Pro forma : peut couvrir plusieurs projets, avec ou sans client", 2800);
   await page.getByRole("link", { name: /Nouvelle pro forma/ }).first().click();
-  await page.getByRole("combobox", { name: "Client" }).click();
-  await page.getByRole("option", { name: "Aminata Gueye" }).click();
-  await type(page.getByLabel("Désignation ligne 1"), "Pack Découverte");
-  await page.getByLabel("Quantité ligne 1").fill("2");
-  await type(page.getByLabel(/Prix unitaire ligne 1/), "400000");
-  await cap("Totaux HT / TVA / TTC calculés en direct", 2400);
+  await page.locator("label", { hasText: "Cyber-sensibilisation Ecobank" }).first().click();
+  await page.locator("label", { hasText: "Programme de sensibilisation Delta" }).first().click();
+  await cap("Deux projets sélectionnés, aucun client choisi", 2400);
+  await page.getByRole("button", { name: /Pré-remplir les lignes/ }).click();
+  await cap("Les lignes sont reprises depuis les packs des projets", 2600);
   await type(page.getByLabel("TVA (%)"), "150");
   await page.getByRole("button", { name: "Créer la pro forma" }).click();
   await cap("TVA hors limites refusée", 2000);
@@ -168,48 +218,106 @@ await step("pro forma: validation, calcul, statuts", async () => {
   await page.getByRole("button", { name: "Créer la pro forma" }).click();
   await page.getByText("Pro forma créée").waitFor();
   await cap("Pro forma créée (numéro PF-… automatique)", 2200);
-  await type(page.getByLabel(/Prix unitaire ligne 1/), "380000");
-  await page.getByRole("button", { name: /Enregistrer les modifications/ }).click();
-  await page.getByText(/Pro forma modifiée/).waitFor();
-  await cap("Modification enregistrée et journalisée", 2000);
-  await cap("Cycle de vie : brouillon → envoyée → acceptée", 2000);
-  await page.getByRole("button", { name: /Marquer « Envoyée »/ }).click();
-  await pause(1500);
-  await cap("Pas de facture possible tant que la pro forma n'est pas acceptée", 2600);
-  await page.getByRole("button", { name: /Marquer « Acceptée »/ }).click();
-  await page.getByRole("button", { name: /Générer la facture commerciale/ }).waitFor();
-  await cap("Acceptée → le bouton « Générer la facture commerciale » apparaît", 2400);
 });
 
-await step("génération de la facture commerciale", async () => {
-  await page.getByRole("button", { name: /Générer la facture commerciale/ }).click();
-  await cap("Action irréversible : confirmation demandée", 2600);
-  await page.getByRole("button", { name: "Générer", exact: true }).click();
+await step("copier le lien = envoi + signature électronique", async () => {
+  await cap("Copier le lien envoie la pro forma ET la signe électroniquement", 2800);
+  await page.getByRole("button", { name: "Copier le lien" }).click();
+  await page.getByText("Signature de l'émetteur").waitFor();
+  urlPro = await lien();
+  await cap("Cachet : nom du signataire, date et empreinte SHA-256 du contenu", 3600);
+});
+
+/* ---------- Le client valide sans compte ---------- */
+await step("client: consulte et valide la pro forma", async () => {
+  await cap("", 0);
+  await page.goto(urlPro);
+  await page.getByRole("heading", { name: /Pro forma PF-/ }).waitFor();
+  await cap("CÔTÉ CLIENT · la pro forma signée, en lecture seule", 3000);
+  await page.getByText("Votre décision").scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Valider", exact: true }).click();
+  await cap("Deux boutons : « Valider » et « Refuser » · identité exigée", 2800);
+  await type(page.getByLabel("Prénom"), "Ibrahima");
+  await type(page.getByLabel("Nom", { exact: true }), "Sy");
+  await type(page.getByLabel("E-mail"), "ibra.sy@exemple.org");
+  await type(page.getByLabel("Téléphone"), "+221 76 111 22 33");
+  await page.getByRole("button", { name: "Valider", exact: true }).click();
+  await cap("Confirmation : la facture sera générée automatiquement", 2800);
+  await page.getByRole("button", { name: "Oui, valider" }).click();
+  await page.getByText("Pro forma validée, merci !").waitFor();
+  await cap("Validée ! La facture commerciale est générée sans intervention", 3000);
+});
+
+await step("client: facture commerciale signée", async () => {
+  await page.getByRole("link", { name: "Consulter ma facture" }).click();
+  await page.getByRole("heading", { name: /Facture FC-/ }).waitFor();
   await page.getByText("Document non modifiable").waitFor();
-  await cap("Facture commerciale FC-… générée · lecture seule", 2600);
+  await cap("Facture commerciale : lecture seule, avec lien de consultation", 2800);
+  await page.getByText("Signature de l'émetteur").scrollIntoViewIfNeeded();
+  await cap("Double signature : l'émetteur ET le client, empreinte vérifiée ✓", 3800);
   await page.emulateMedia({ media: "print" });
   await cap("Aperçu à l'impression / PDF", 3000);
   await page.emulateMedia({ media: null });
 });
 
-await step("pro forma verrouillée", async () => {
-  await page.getByRole("link", { name: "Factures" }).first().click();
-  await page.locator("tr", { hasText: "Gueye" }).getByRole("link").first().click().catch(async () => {
-    await page.locator("tr", { hasText: "facturée" }).getByRole("link").first().click();
+await step("agent: la pro forma est verrouillée, le client ajouté", async () => {
+  await retourEspaceInterne("/factures", async () => {
+    await page.getByRole("heading", { name: "Factures" }).waitFor();
   });
+  await page.locator("tr", { hasText: "facturée" }).getByRole("link").first().click();
   await page.getByText(/Verrouillée/).waitFor();
-  await cap("La pro forma facturée est verrouillée : ni modification ni suppression", 3200);
+  await cap("CÔTÉ AGENT · pro forma facturée : verrouillée, décision du client visible", 3400);
+  await page.getByRole("link", { name: "Clients" }).first().click();
+  await page.getByRole("link", { name: "Ibrahima Sy" }).waitFor();
+  await cap("Le signataire a été ajouté à la base clients (qualifié)", 3000);
   await page.getByRole("link", { name: "Factures" }).first().click();
   await page.getByRole("tab", { name: "Commerciales" }).click();
-  await cap("Liste des factures commerciales", 2200);
+  await page.getByRole("link", { name: /FC-/ }).first().click();
+  await page.getByText("Signature valide").waitFor();
+  await cap("Facture côté agent : lien copiable à envoyer par n'importe quel canal", 3200);
 });
 
+await step("client: refuse une pro forma avec motif", async () => {
+  await page.getByRole("link", { name: "Factures" }).first().click();
+  await page.getByRole("link", { name: /Nouvelle pro forma/ }).first().click();
+  await page.getByRole("combobox", { name: "Client" }).click();
+  await page.getByRole("option", { name: "Awa Camara" }).click();
+  await type(page.getByLabel("Désignation ligne 1"), "Atelier simulation de crise");
+  await type(page.getByLabel(/Prix unitaire ligne 1/), "150000");
+  await page.getByRole("button", { name: "Créer la pro forma" }).click();
+  await page.getByText("Pro forma créée").waitFor();
+  await page.getByRole("button", { name: "Copier le lien" }).click();
+  await page.getByText("Signature de l'émetteur").waitFor();
+  const url = await lien();
+  await cap("", 0);
+  await page.goto(url);
+  await page.getByRole("heading", { name: /Pro forma PF-/ }).waitFor();
+  await cap("Pro forma d'un client connu : il signe simplement de son nom", 2800);
+  await type(page.getByLabel(/Votre nom complet/), "Awa Camara");
+  await page.getByRole("button", { name: "Refuser" }).click();
+  await type(page.getByLabel(/Motif/), "Budget insuffisant cette année");
+  await cap("Refus avec motif facultatif", 2400);
+  await page.getByRole("button", { name: "Oui, refuser" }).click();
+  await page.getByText("Votre refus a bien été transmis").waitFor();
+  await cap("Refus transmis : aucune facture n'est générée", 2800);
+});
+
+await step("liens invalides", async () => {
+  await cap("", 0);
+  await page.goto(`${BASE}/p/${"0".repeat(36)}`);
+  await page.getByText("Lien introuvable").waitFor();
+  await cap("Lien inconnu ou mal formé : message clair, aucune information divulguée", 3000);
+});
+
+/* ---------- Limites de l'agent ---------- */
 await step("limites de l'agent", async () => {
-  await page.goto(`${BASE}/journal`);
-  await page.getByText(/réservé au chef/).first().waitFor();
+  await retourEspaceInterne("/journal", async () => {
+    await page.getByText(/réservé au chef/).first().waitFor();
+  });
   await cap("Journal global : accès refusé à l'agent", 2600);
   const chefTok = await apiToken("chef");
   const r = await (await fetch(`${API}/clients?q=kabor`, { headers: { Authorization: `Bearer ${chefTok}` } })).json();
+  await cap("", 0);
   await page.goto(`${BASE}/clients/${r.data[0].id}`);
   await page.getByText(/introuvable/i).first().waitFor();
   await cap("Client d'un autre utilisateur : introuvable pour l'agent", 3000);
@@ -222,20 +330,6 @@ await step("tâches de l'agent (kanban)", async () => {
   const card = page.locator("article", { hasText: "Relancer les prospects" });
   await card.dragTo(page.getByRole("region", { name: "En cours" }));
   await cap("Glisser-déposer : la tâche passe « En cours »", 2600);
-  await page.locator("article", { hasText: "Préparer la démo" }).getByRole("combobox").click();
-  await page.getByRole("option", { name: "Terminée" }).click();
-  await cap("Ou via le menu de statut (accessible au clavier)", 2400);
-});
-
-await step("affichage mobile", async () => {
-  await page.setViewportSize({ width: 390, height: 780 });
-  await pause(800);
-  await cap("Interface adaptée au mobile", 1800);
-  await page.getByRole("button", { name: "Ouvrir le menu" }).click();
-  await pause(1800);
-  await page.keyboard.press("Escape");
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await pause(800);
 });
 
 /* ===================== CHEF ===================== */
@@ -245,10 +339,6 @@ await step("connexion chef d'équipe", async () => {
   await page.getByRole("heading", { name: "Clients" }).waitFor();
   await page.getByText("Moussa Traore").first().waitFor();
   await cap("Le chef voit les clients de toute l'équipe + le menu « Journal »", 3200);
-  await page.getByRole("combobox", { name: "Ajouté par" }).click();
-  await page.getByRole("option", { name: /Moussa/ }).click();
-  await cap("Filtre « Ajouté par » (réservé au chef)", 2600);
-  await page.getByRole("button", { name: "Réinitialiser" }).click();
 });
 
 await step("avancement d'équipe et assignation", async () => {
@@ -264,23 +354,21 @@ await step("avancement d'équipe et assignation", async () => {
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await page.getByText("Tâche assignée").waitFor();
   await cap("Tâche assignée à l'agent", 2200);
-  await page.getByRole("tab", { name: "Toutes les tâches" }).click();
-  await cap("Toutes les tâches : filtres, modification, suppression", 2800);
 });
 
-await step("journal de traçabilité", async () => {
+await step("journal: actions internes ET événements publics", async () => {
   await page.getByRole("link", { name: "Journal" }).first().click();
   await page.getByText("Journal de traçabilité").waitFor();
-  await cap("Journal : qui, quoi, quand — lecture seule", 3200);
-  await cap("Filtrer le journal par type d'action", 1500);
+  await cap("Journal : qui, quoi, quand — y compris les actions des clients via les liens", 3600);
   await page.getByRole("combobox", { name: "Filtrer par action" }).click();
-  await page.getByRole("option", { name: /Génération de facture/ }).click();
-  await cap("Filtre par action : générations de facture", 2800);
+  await page.getByRole("option", { name: /Pro forma validée par le client/ }).click();
+  await cap("Validation d'une pro forma par le client, tracée avec sa signature", 3200);
   await page.getByRole("combobox", { name: "Filtrer par action" }).click();
-  await page.getByRole("option", { name: "Toutes les actions" }).click();
+  await page.getByRole("option", { name: /Inscription via un lien/ }).click();
+  await cap("Inscription d'un prospect via le lien du projet", 3000);
   await page.getByRole("combobox", { name: "Filtrer par action" }).click();
-  await page.getByRole("option", { name: /Modification de pro forma/ }).click();
-  await cap("Modifications de pro forma avec montants avant → après", 3200);
+  await page.getByRole("option", { name: /Pro forma refusée par le client/ }).click();
+  await cap("Refus d'une pro forma, avec le motif saisi", 3200);
 });
 
 await cap("Fin de la démonstration · ByteSec CRM MVP", 3500);

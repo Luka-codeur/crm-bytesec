@@ -52,7 +52,8 @@ export interface ProjetTable {
   id: Generated<string>;
   nom: string;
   description: Generated<string>;
-  client_id: string;
+  client_id: string | null;
+  token_consultation: Generated<string>;
   statut: Generated<'brouillon' | 'envoye'>;
   envoye_le: Ts | null;
   cree_par: string;
@@ -66,7 +67,21 @@ export interface PackTable {
   nom: string;
   description: Generated<string>;
   prix_centimes: number;
+  nb_tranches: Generated<number>;
+  prix_personnalise: Generated<boolean>;
   position: Generated<number>;
+}
+
+export interface ProjetInscriptionTable {
+  id: Generated<string>;
+  projet_id: string;
+  client_id: string;
+  cree_le: Generated<Date>;
+}
+
+export interface ProformaProjetTable {
+  proforma_id: string;
+  projet_id: string;
 }
 
 export interface PackFormationTable {
@@ -78,8 +93,13 @@ export interface PackFormationTable {
 export interface ProformaTable {
   id: Generated<string>;
   numero: string;
-  client_id: string;
-  projet_id: string | null;
+  client_id: string | null;
+  token_consultation: Generated<string>;
+  signe_par: string | null;
+  signe_le: Date | null;
+  decision_client_nom: string | null;
+  decision_client_le: Date | null;
+  decision_hash: string | null;
   tva_pourcent: Generated<number>;
   statut: Generated<'brouillon' | 'envoyee' | 'acceptee' | 'refusee'>;
   cree_par: string;
@@ -106,6 +126,12 @@ export interface FactureCommercialeTable {
   total_ttc_centimes: number;
   emise_par: string;
   emise_le: Generated<Date>;
+  token_consultation: Generated<string>;
+  signature_nom: string | null;
+  signature_le: Date | null;
+  signature_hash: string | null;
+  client_signataire: string | null;
+  client_signe_le: Date | null;
 }
 
 export interface LigneFactureCommercialeTable {
@@ -132,8 +158,15 @@ export interface TacheTable {
 export interface JournalTable {
   id: Generated<string>;
   acteur_id: string;
-  action: 'PROFORMA_MODIFIEE' | 'FACTURE_GENEREE' | 'STATUT_CLIENT_MODIFIE';
-  cible_type: 'client' | 'proforma' | 'facture_commerciale';
+  action:
+    | 'PROFORMA_MODIFIEE'
+    | 'FACTURE_GENEREE'
+    | 'STATUT_CLIENT_MODIFIE'
+    | 'CLIENT_INSCRIT'
+    | 'PROFORMA_VALIDEE_CLIENT'
+    | 'PROFORMA_REFUSEE_CLIENT';
+  cible_type: 'client' | 'proforma' | 'facture_commerciale' | 'projet';
+  acteur_externe: string | null;
   cible_id: string;
   cible_libelle: string;
   client_id: string | null;
@@ -150,6 +183,8 @@ export interface Database {
   projet: ProjetTable;
   pack: PackTable;
   pack_formation: PackFormationTable;
+  projet_inscription: ProjetInscriptionTable;
+  proforma_projet: ProformaProjetTable;
   proforma: ProformaTable;
   ligne_proforma: LigneProformaTable;
   facture_commerciale: FactureCommercialeTable;

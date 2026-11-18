@@ -1,10 +1,13 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { ErrorFilter, validationPipe } from './common/http';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Derrière Caddy : l'adresse IP réelle (limitation de fréquence des liens publics) vient de X-Forwarded-For.
+  app.set('trust proxy', 1);
   app.setGlobalPrefix('api');
   app.useGlobalPipes(validationPipe());
   app.useGlobalFilters(new ErrorFilter());

@@ -52,11 +52,11 @@ f2 = call(A, "POST", "/formations", {"titre": "Hygiène numérique des équipes"
 f3 = call(A, "POST", "/formations", {"titre": "Réponse à incident pour managers", "description": "Premiers réflexes", "dureeHeures": 6, "prixCentimes": 60000000})
 
 # --- un projet déjà facturé pour Mariam Ba
-projet = call(A, "POST", "/projets", {"nom": "Programme de sensibilisation Delta", "description": "Formation des 120 collaborateurs", "clientId": mariam["id"],
+projet = call(A, "POST", "/projets", {"nom": "Programme de sensibilisation Delta", "description": "Formation des 120 collaborateurs",
                                        "packs": [{"nom": "Pack Essentiel", "prixCentimes": 55000000, "formations": [{"id": f1["id"]}, {"id": f2["id"]}]}]})
 call(A, "PATCH", f"/clients/{mariam['id']}", {"projetId": projet["id"]})
-call(A, "POST", f"/projets/{projet['id']}/envoyer")
-pf = call(A, "POST", "/proformas", {"clientId": mariam["id"], "projetId": projet["id"], "tvaPourcent": 18,
+call(A, "POST", f"/projets/{projet['id']}/partager")
+pf = call(A, "POST", "/proformas", {"clientId": mariam["id"], "projetIds": [projet["id"]], "tvaPourcent": 18,
                                      "lignes": [{"designation": "Pack Essentiel (120 pers.)", "quantite": 1, "prixUnitaireCentimes": 55000000}]})
 call(A, "PATCH", f"/proformas/{pf['id']}/statut", {"statut": "envoyee"})
 call(A, "PATCH", f"/proformas/{pf['id']}/statut", {"statut": "acceptee"})

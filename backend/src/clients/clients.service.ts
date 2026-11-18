@@ -126,8 +126,14 @@ export class ClientsService {
     await this.assertVisible(user, id);
     const { projetId, statut, ...rest } = patch;
     if (projetId) {
-      const p = await this.db.selectFrom('projet').select('id').where('id', '=', projetId).where('client_id', '=', id).executeTakeFirst();
-      if (!p) throw new ApiException(422, 'Ce projet n’appartient pas à ce client.', 'VALIDATION', { projetId: 'Projet invalide' });
+      // Le projet doit être dans le périmètre de l'utilisateur (créé par lui, ou par son équipe pour un chef).
+      const p = await this.db
+        .selectFrom('projet')
+        .select('id')
+        .where('id', '=', projetId)
+        .where((eb) => clientScope(eb, user, 'cree_par'))
+        .executeTakeFirst();
+      if (!p) throw new ApiException(422, 'Projet introuvable.', 'VALIDATION', { projetId: 'Projet invalide' });
     }
     // Le statut ne change que via setStatut (journalisé) : on l'y redirige.
     if (statut) return this.setStatut(user, id, statut, { ...rest, ...(projetId !== undefined ? { projet_id: projetId } : {}) });

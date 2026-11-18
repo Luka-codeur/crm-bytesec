@@ -1,4 +1,4 @@
-// Prerequis : npm i playwright (hors depot) ; Chrome installe. Voir README (Tests).
+// Prerequis : npm i playwright (hors depot) ; Chrome installe. Voir le README, section Tests.
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:8082";
@@ -61,30 +61,30 @@ await check("changement de statut + historique", async () => {
   await page.getByText("Prospect").first().waitFor();
 });
 
-await check("projet: formation + pack + creation", async () => {
+await check("projet sans client: pack, prix auto et tranches", async () => {
   await page.getByRole("link", { name: "Projets" }).first().click();
   await page.getByRole("link", { name: /Nouveau projet/ }).first().click();
   await page.getByLabel("Nom du projet").fill("Sensibilisation Binta");
-  await page.getByRole("combobox", { name: "Client" }).click();
-  await page.getByRole("option", { name: "Binta Sarr" }).click();
+  if (await page.getByRole("combobox", { name: "Client" }).count()) throw new Error("champ client encore present");
   await page.getByLabel("Titre de la formation").fill("Phishing 101");
   await page.getByLabel("Durée en heures").fill("3");
   await page.getByLabel("Prix en FCFA").fill("250000");
   await page.getByRole("button", { name: "Ajouter au catalogue" }).click();
   await page.getByText("Formation ajoutée au catalogue").waitFor();
+  await page.getByRole("button", { name: /Ajouter un pack/ }).click();
   await page.getByLabel("Nom du pack").fill("Pack Phishing");
-  await page.getByLabel("Prix (FCFA)").first().fill("250000");
   await page.locator("label", { hasText: "Phishing 101" }).first().click();
+  await page.getByText(/Calculé automatiquement/).waitFor();
+  await page.getByText(/83\s333[\s\S]*83\s333[\s\S]*83\s334/).waitFor();
   await page.getByRole("button", { name: "Créer le projet" }).click();
-  await page.getByText("Projet créé").waitFor();
+  await page.getByText(/Projet créé/).waitFor();
   await page.getByRole("heading", { name: "Sensibilisation Binta" }).waitFor();
   await page.getByText("Phishing 101").first().waitFor();
 });
-await check("envoyer le projet", async () => {
-  await page.getByRole("button", { name: /Envoyer au client/ }).click();
-  await page.getByRole("button", { name: "Envoyer", exact: true }).click();
-  await page.getByText("Projet envoyé au client").waitFor();
-  await page.getByText("Envoyé", { exact: true }).first().waitFor();
+await check("lien de consultation du projet (copie + statut Partagé)", async () => {
+  await page.getByRole("button", { name: "Copier le lien" }).click();
+  await page.getByText("Lien copié dans le presse-papiers").waitFor();
+  await page.getByText("Partagé", { exact: true }).first().waitFor();
 });
 
 await check("pro forma: creation avec totaux", async () => {

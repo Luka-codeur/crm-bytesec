@@ -10,7 +10,7 @@ import { InjectKysely } from '../database/database.module';
 import type { Database, JournalTable } from '../database/schema';
 
 class JournalQuery {
-  @IsOptional() @IsIn(['PROFORMA_MODIFIEE', 'FACTURE_GENEREE', 'STATUT_CLIENT_MODIFIE']) action?: JournalTable['action'];
+  @IsOptional() @IsIn(['PROFORMA_MODIFIEE', 'FACTURE_GENEREE', 'STATUT_CLIENT_MODIFIE', 'CLIENT_INSCRIT', 'PROFORMA_VALIDEE_CLIENT', 'PROFORMA_REFUSEE_CLIENT']) action?: JournalTable['action'];
   @IsOptional() @IsString() acteurId?: string;
   @IsOptional() @IsString() du?: string;
   @IsOptional() @IsString() au?: string;
@@ -52,7 +52,7 @@ class JournalController {
     const { n } = await base.select((eb) => eb.fn.countAll<number>().as('n')).executeTakeFirstOrThrow();
     const rows = await base
       .select([
-        'j.id', 'j.action', 'j.cible_type', 'j.cible_id', 'j.cible_libelle', 'j.client_id', 'j.avant', 'j.apres', 'j.date',
+        'j.id', 'j.action', 'j.cible_type', 'j.cible_id', 'j.cible_libelle', 'j.client_id', 'j.avant', 'j.apres', 'j.date', 'j.acteur_externe',
         'u.id as acteur_id', 'u.nom as acteur_nom', 'u.prenom as acteur_prenom',
       ])
       .orderBy('j.date', 'desc')
@@ -63,7 +63,7 @@ class JournalController {
     return {
       data: rows.map((r) => ({
         id: r.id,
-        acteur: { id: r.acteur_id, nom: `${r.acteur_prenom} ${r.acteur_nom}`.trim() },
+        acteur: { id: r.acteur_id, nom: r.acteur_externe ?? `${r.acteur_prenom} ${r.acteur_nom}`.trim() },
         action: r.action,
         cible: { type: r.cible_type, id: r.cible_id, libelle: r.cible_libelle },
         details: { ...(r.avant ? { avant: r.avant } : {}), ...(r.apres ? { apres: r.apres } : {}) },
