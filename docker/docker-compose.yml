@@ -1,0 +1,96 @@
+# Stack CRM ByteSec : Postgres, Liquibase, Keycloak, API NestJS.
+# Depuis la racine du depot :
+#   docker compose -f docker/docker-compose.yml up --build
+name: crm
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+    ports:
+      - '${POSTGRES_PORT:-54320}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-crm}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  liquibase:
+    image: liquibase/liquibase:4.31
+    command: update
+    environment:
+      LIQUIBASE_SEARCH_PATH: /liquibase/changelog
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: db.changelog-master.yaml
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-crm}
+      LIQUIBASE_COMMAND_USERNAME: ${POSTGRES_USER:-crm}
+      LIQUIBASE_COMMAND_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+    volumes:
+      - ../db/liquibase/changelog:/liquibase/changelog:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-crm}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+      KC_HEALTH_ENABLED: 'true'
+    ports:
+      - '${KEYCLOAK_PORT:-8080}:8080'
+    volumes:
+      - ./keycloak/realm-crm.json:/opt/keycloak/data/import/realm-crm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      PORT: '3000'
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      DATABASE_URL: postgres://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-crm}@postgres:5432/${POSTGRES_DB:-crm}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-crm}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-crm-frontend}
+    ports:
+      - '${BACKEND_PORT:-3000}:3000'
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+
+  # Front Lovable (dossier frontend/) : profil "front".
+  #   docker compose -f docker/docker-compose.yml --profile front up --build
+  frontend:
+    profiles: ['front']
+    build:
+      context: ../frontend
+      dockerfile: ../docker/frontend.Dockerfile
+      args:
+        VITE_USE_MOCK: 'false'
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+        VITE_KEYCLOAK_URL: ${PUBLIC_KEYCLOAK_URL:-http://localhost:8080}
+        VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-crm}
+        VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-crm-frontend}
+    ports:
+      - '${FRONTEND_PORT:-8081}:8080'
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:

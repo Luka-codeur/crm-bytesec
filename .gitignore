@@ -1,0 +1,25 @@
+# Dépendances et builds
+node_modules/
+dist/
+.output/
+.wrangler/
+*.tsbuildinfo
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Le front Lovable garde son propre dépôt git (synchronisation Lovable) : voir README
+frontend/
+
+# Vidéo de démonstration (volumineuse) et artefacts de test
+demo/*.webm
+demo/*.mp4
+e2e/video/
+e2e/frames*/
+*.log
+
+# Réglages locaux de l outil Claude Code
+.claude/

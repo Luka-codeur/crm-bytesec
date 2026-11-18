@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - include:
+      file: changes/0001-init.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0002-utilisateurs-clients.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0003-catalogue-projets.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0004-factures.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0005-taches-journal.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0006-seed-equipe.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0007-fix-proforma-verrou.sql
+      relativeToChangelogFile: true

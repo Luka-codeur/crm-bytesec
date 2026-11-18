@@ -1,0 +1,56 @@
+{
+  "realm": "crm",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["fr", "en"],
+  "defaultLocale": "fr",
+  "roles": {
+    "realm": [
+      { "name": "agent", "description": "Agent commercial" },
+      { "name": "chef_equipe", "description": "Chef d'equipe" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "crm-frontend",
+      "name": "CRM ByteSec (front)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:*", "http://localhost:8081/*"],
+      "webOrigins": ["http://localhost:8081", "http://localhost:8082", "http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "agent",
+      "email": "agent@bytesec.local",
+      "firstName": "Awa",
+      "lastName": "Diallo",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "agent", "temporary": false }],
+      "realmRoles": ["agent"]
+    },
+    {
+      "username": "chef",
+      "email": "chef@bytesec.local",
+      "firstName": "Moussa",
+      "lastName": "Traore",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "chef", "temporary": false }],
+      "realmRoles": ["chef_equipe"]
+    }
+  ]
+}
