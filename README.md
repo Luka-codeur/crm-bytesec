@@ -14,7 +14,8 @@ Suivi des clients, projets (packs et formations), factures pro forma et commerci
 
 ## Démarrer en local (testeurs)
 
-Prérequis : Docker, Node 22+, Python 3.10+, Chrome (pour les tests navigateur).
+Prérequis : Docker, Node 22+, **bun** (le front l'utilise : `npm install -g bun`, ou `curl -fsSL https://bun.sh/install | bash`), Python 3.10+, Chrome (pour les tests navigateur).
+Si `bun install` répond « command not found », bun n'est pas installé : installez-le d'abord (voir ci-dessus).
 
 ```bash
 git clone https://github.com/Luka-codeur/crm-bytesec.git && cd crm-bytesec
