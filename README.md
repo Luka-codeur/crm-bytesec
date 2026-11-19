@@ -10,7 +10,7 @@ Suivi des clients, projets (packs et formations), factures pro forma et commerci
 | `db/liquibase/` | Migrations SQL versionnées (seule source de vérité du schéma) |
 | `docker/` | Compose de dev et de production (Caddy + HTTPS), realm Keycloak |
 | `e2e/` | Parcours navigateur Playwright et script de la vidéo de démo |
-| `frontend/` | **Dépôt séparé** : [Luka-codeur/bytesec-client-compass](https://github.com/Luka-codeur/bytesec-client-compass) (à cloner ici, voir ci-dessous) |
+| `frontend/` | Front React / TanStack Start (généré avec Lovable, puis adapté) |
 
 ## Démarrer en local (testeurs)
 
@@ -18,7 +18,6 @@ Prérequis : Docker, Node 22+, Python 3.10+, Chrome (pour les tests navigateur).
 
 ```bash
 git clone https://github.com/Luka-codeur/crm-bytesec.git && cd crm-bytesec
-git clone https://github.com/Luka-codeur/bytesec-client-compass.git frontend    # le front (dépôt Lovable)
 
 docker compose -f docker/docker-compose.yml up -d postgres liquibase keycloak   # base + migrations + Keycloak
 cd backend && cp .env.example .env && npm install && npm run build && npm start # API sur :3000

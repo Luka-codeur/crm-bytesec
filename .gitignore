@@ -11,8 +11,6 @@ dist/
 !.env.example
 !.env.prod.example
 
-# Le front Lovable garde son propre dépôt git (synchronisation Lovable) : voir README
-frontend/
 
 # Vidéo de démonstration (volumineuse) et artefacts de test
 demo/*.webm
